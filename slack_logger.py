@@ -20,22 +20,34 @@ class SlackWebhookHandler(logging.Handler):
         log_entry = self.format(record)
         data = json.dumps({"text": log_entry}).encode("utf-8")
         request = Request(
-            webhook_url, data=data, headers={"Content-Type": "application/json"}
+            webhook_url,
+            data=data,
+            headers={"Content-Type": "application/json"},
         )
         try:
-            with urlopen(request) as response:  # noqa: S310 (urllib urlopen is safe here)
+            with urlopen(
+                    request, timeout=5
+            ) as response:  # noqa: S310
                 response.read()
-        except (HTTPError, URLError):
+        except HTTPError:
             # Avoid raising exceptions during logging.
             pass
-
+        except URLError as error:
+            if isinstance(getattr(error, "reason", None), TimeoutError):
+                logging.warning("Slack webhook request timed out")
+            # Avoid raising exceptions during logging.
+            pass
+        except TimeoutError:
+            logging.warning("Slack webhook request timed out")
 
 def get_logger(name: str = __name__) -> logging.Logger:
     """Return a logger configured with Slack webhook integration."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         logger.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s"
+        )
 
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)

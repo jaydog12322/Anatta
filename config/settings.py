@@ -7,15 +7,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Load variables from `.env` if it exists in the project root.
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-if _ENV_FILE.exists():
-    for line in _ENV_FILE.read_text().splitlines():
-        if not line or line.strip().startswith("#"):
-            continue
-        key, _, value = line.partition("=")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
