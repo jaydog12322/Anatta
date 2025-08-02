@@ -23,9 +23,49 @@ class SpreadDetector:
     def __init__(self, fees: float = 0.00035, buffer: float = 0.0001):
         self.fees = fees
         self.buffer = buffer
-        self.book: Dict[str, Tick] = {}
+        self.book: Dict[tuple[str, str], Tick] = {}
 
     def on_tick(self, tick: Tick) -> list[TradeIntent]:
-        self.book[tick.exchange + tick.symbol.krx_code] = tick
-        # placeholder logic
-        return []
+        """Update internal state with *tick* and emit trade intents.
+
+                Ticks are stored keyed by ``(symbol.krx_code, exchange)``. When both
+                KRX and NXT quotes are available for a symbol, the function computes the
+                cross-exchange spreads and, if profitable beyond fees plus a buffer,
+                returns the corresponding :class:`TradeIntent` objects.
+                """
+
+        # store the latest tick for this symbol/exchange pair
+        self.book[(tick.symbol.krx_code, tick.exchange)] = tick
+
+        krx_tick = self.book.get((tick.symbol.krx_code, "KRX"))
+        nxt_tick = self.book.get((tick.symbol.krx_code, "NXT"))
+
+        intents: list[TradeIntent] = []
+        threshold = self.fees + self.buffer
+
+        if krx_tick and nxt_tick:
+            # Buy on KRX, sell on NXT
+            spread_kn = (nxt_tick.bid - krx_tick.ask) / krx_tick.ask
+            if spread_kn > threshold:
+                intents.append(
+                    TradeIntent(
+                        symbol=tick.symbol,
+                        buy_exchange="KRX",
+                        sell_exchange="NXT",
+                        qty=1,
+                    )
+                )
+
+            # Buy on NXT, sell on KRX
+            spread_nk = (krx_tick.bid - nxt_tick.ask) / nxt_tick.ask
+            if spread_nk > threshold:
+                intents.append(
+                    TradeIntent(
+                        symbol=tick.symbol,
+                        buy_exchange="NXT",
+                        sell_exchange="KRX",
+                        qty=1,
+                    )
+                )
+
+        return intents

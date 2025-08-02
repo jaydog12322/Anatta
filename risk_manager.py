@@ -14,5 +14,11 @@ class RiskManager:
 
     def approve(self, intent: TradeIntent) -> bool:
         key = intent.symbol.krx_code
-        self.counts[key] = self.counts.get(key, 0) + 1
-        return self.counts[key] <= self.max_trips
+        current = self.counts.get(key, 0)
+        if current >= self.max_trips:
+            return False
+        self.counts[key] = current + 1
+        return True
+
+    def reset_counts(self) -> None:
+        self.counts.clear()

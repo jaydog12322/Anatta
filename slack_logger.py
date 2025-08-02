@@ -8,6 +8,18 @@ from urllib.request import Request, urlopen
 from config.settings import SLACK_WEBHOOK_URL
 
 
+INTERNAL_LOGGER_NAME = "slack"
+_internal_logger = logging.getLogger(INTERNAL_LOGGER_NAME)
+_internal_logger.setLevel(logging.WARNING)
+_internal_logger.propagate = False
+if not _internal_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    )
+    _internal_logger.addHandler(_handler)
+
+
 class SlackWebhookHandler(logging.Handler):
     """Logging handler that posts messages to a Slack Incoming Webhook."""
 
@@ -34,14 +46,17 @@ class SlackWebhookHandler(logging.Handler):
             pass
         except URLError as error:
             if isinstance(getattr(error, "reason", None), TimeoutError):
-                logging.warning("Slack webhook request timed out")
+                _internal_logger.warning("Slack webhook request timed out")
             # Avoid raising exceptions during logging.
             pass
         except TimeoutError:
-            logging.warning("Slack webhook request timed out")
+            _internal_logger.warning("Slack webhook request timed out")
 
 def get_logger(name: str = __name__) -> logging.Logger:
     """Return a logger configured with Slack webhook integration."""
+    if name == INTERNAL_LOGGER_NAME:
+        return _internal_logger
+
     logger = logging.getLogger(name)
     if not logger.handlers:
         logger.setLevel(logging.INFO)
