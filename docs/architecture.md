@@ -111,7 +111,7 @@ Outputs: Structured log files, Slack messages via webhook.
 Parameters: Log level, Slack webhook URL, alert filters.
 
 ## Current Repository Status
-config/symbol_map.csv exists and lists ~50 KOSPI symbols with index and ticker columns. Rename and expand to include KRX_code and future NXT_code columns for the arbitrage engine.
+config/symbol_map.csv exists and lists ~50 KOSPI symbols with KRX_code, NXT_code, and Name columns.
 
 ## Slack Webhook Setup
 Create a Slack app (https://api.slack.com/apps) and enable Incoming Webhooks.
