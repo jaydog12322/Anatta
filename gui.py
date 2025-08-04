@@ -94,7 +94,8 @@ class MainWindow(QMainWindow):
         try:
             self.log_message("Connecting to Kiwoom…")
             self.kiwoom.CommConnect()
-            accounts = self.kiwoom.GetLoginInfo("ACCNO").split(";")
+            raw_accounts = self.kiwoom.GetLoginInfo("ACCNO")
+            accounts = raw_accounts.split(";") if isinstance(raw_accounts, str) else raw_accounts
             account = accounts[0] if accounts else None
             if not account:
                 raise RuntimeError("No Kiwoom account available")
