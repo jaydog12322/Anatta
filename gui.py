@@ -34,10 +34,11 @@ class Feed:
             self.kw.SetRealReg(screen, sym.krx_code, "41;61", "0")
             self.kw.SetRealReg(screen, sym.nxt_code, "41;61", "0")
 
-        self.kw.OnReceiveRealData.connect(self._handle)
+        # Override the default callback to handle real-time data ticks
+        self.kw.OnReceiveRealData = self._handle
 
     @pyqtSlot(str, str, str)
-    def _handle(self, code: str, _type: str, _data: str) -> None:
+    def _handle(self, code: str, real_type: str, real_data: str) -> None:
         mapping = self.code_map.get(code)
         if not mapping:
             return
