@@ -112,14 +112,14 @@ class OrderExecutor:
 
 
     def _send(self, intent: TradeIntent) -> None:
-        raise NotImplementedError("Order submission to Kiwoom pending")
+
         """Submit paired orders and recover from failures.
 
-                Orders are sent sequentially: the cheaper leg is bought first; upon
-                confirmation the opposing leg is sold.  If the second leg fails, a
-                market order is issued to flatten the residual position on the first
-                exchange.
-                """
+        Orders are sent sequentially: the cheaper leg is bought first; upon
+        confirmation the opposing leg is sold.  If the second leg fails, a
+        market order is issued to flatten the residual position on the first
+        exchange.
+        """
 
         buy_code = (
             intent.symbol.krx_code if intent.buy_exchange == "KRX" else intent.symbol.nxt_code
@@ -135,11 +135,11 @@ class OrderExecutor:
         # flattening order to offset the filled buy leg.
         try:
             self._submit_and_wait(sell_code, "SELL", intent.qty)
-        except OrderError:
+        except OrderError as err:
             try:
                 self._submit_and_wait(buy_code, "SELL", intent.qty)
             except OrderError:
                 # If flattening also fails we simply propagate the error; an
                 # external risk manager should handle any residual exposure.
                 pass
-            raise
+            raise err
