@@ -1,4 +1,4 @@
-import os
+
 import sys
 import traceback
 from PyQt5.QtWidgets import (
@@ -77,14 +77,7 @@ class MainWindow(QMainWindow):
         self.detector = SpreadDetector()
         self.risk = RiskManager()
 
-        account = os.getenv("KIWOOM_ACCOUNT", "YOUR_ACCOUNT")
-        if account == "YOUR_ACCOUNT":
-            raise ValueError("Set KIWOOM_ACCOUNT before running.")
-        account = os.getenv("KIWOOM_ACCOUNT", "YOUR_ACCOUNT")
-        if account == "YOUR_ACCOUNT":
-            raise ValueError("Set KIWOOM_ACCOUNT before running.")
-
-        self.executor = OrderExecutor(session=self.kiwoom, account=account)
+        self.executor = None
         self.feed = None
 
     def log_message(self, text: str) -> None:
@@ -101,6 +94,12 @@ class MainWindow(QMainWindow):
         try:
             self.log_message("Connecting to Kiwoom…")
             self.kiwoom.CommConnect()
+            accounts = self.kiwoom.GetLoginInfo("ACCNO").split(";")
+            account = accounts[0] if accounts else None
+            if not account:
+                raise RuntimeError("No Kiwoom account available")
+            self.executor = OrderExecutor(session=self.kiwoom, account=account)
+            self.log_message(f"Using account {account}")
             self.feed = Feed(self.kiwoom, self.symbols, self.on_tick)
             self.log_message("Subscribed to real-time feed.")
         except Exception as exc:
