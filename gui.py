@@ -1,4 +1,6 @@
+import os
 import sys
+import traceback
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -74,7 +76,15 @@ class MainWindow(QMainWindow):
         self.kiwoom = Kiwoom()
         self.detector = SpreadDetector()
         self.risk = RiskManager()
-        self.executor = OrderExecutor(session=self.kiwoom, account="YOUR_ACCOUNT")
+
+        account = os.getenv("KIWOOM_ACCOUNT", "YOUR_ACCOUNT")
+        if account == "YOUR_ACCOUNT":
+            raise ValueError("Set KIWOOM_ACCOUNT before running.")
+        account = os.getenv("KIWOOM_ACCOUNT", "YOUR_ACCOUNT")
+        if account == "YOUR_ACCOUNT":
+            raise ValueError("Set KIWOOM_ACCOUNT before running.")
+
+        self.executor = OrderExecutor(session=self.kiwoom, account=account)
         self.feed = None
 
     def log_message(self, text: str) -> None:
@@ -88,10 +98,15 @@ class MainWindow(QMainWindow):
         if not self.symbols:
             self.log_message("Load symbols first.")
             return
-        self.log_message("Connecting to Kiwoom…")
-        self.kiwoom.CommConnect()
-        self.feed = Feed(self.kiwoom, self.symbols, self.on_tick)
-        self.log_message("Subscribed to real-time feed.")
+        try:
+            self.log_message("Connecting to Kiwoom…")
+            self.kiwoom.CommConnect()
+            self.feed = Feed(self.kiwoom, self.symbols, self.on_tick)
+            self.log_message("Subscribed to real-time feed.")
+        except Exception as exc:
+            msg = f"Start test failed: {exc}\n{traceback.format_exc()}"
+            self.log_message(msg)
+            print(msg, file=sys.stderr)
 
     def on_tick(self, tick: Tick) -> None:
         self.log_message(
@@ -101,12 +116,15 @@ class MainWindow(QMainWindow):
         for intent in intents:
             if self.risk.approve(intent):
                 self.log_message(
-                    f"Approved: {intent.symbol.ticker} {intent.buy_exchange}->{intent.sell_exchange}"
+                    f"Approved: {intent.symbol.ticker} "
+                    f"{intent.buy_exchange}->{intent.sell_exchange}"
                 )
                 try:
                     self.executor.execute([intent])
                     self.log_message(
-                        f"Executed: {intent.symbol.ticker} {intent.buy_exchange}->{intent.sell_exchange} qty={intent.qty}"
+                        f"Executed: {intent.symbol.ticker} "
+                        f"{intent.buy_exchange}->{intent.sell_exchange} "
+                        f"qty={intent.qty}"
                     )
                 except NotImplementedError:
                     self.log_message("OrderExecutor._send not implemented.")
