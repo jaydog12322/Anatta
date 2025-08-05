@@ -1,4 +1,3 @@
-
 import sys
 import traceback
 from PyQt5.QtWidgets import (
@@ -9,7 +8,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSlot, QEventLoop
 from pykiwoom.kiwoom import Kiwoom
 
 from symbol_loader import load_symbols
@@ -34,8 +33,12 @@ class Feed:
             self.kw.SetRealReg(screen, sym.krx_code, "41;61", "0")
             self.kw.SetRealReg(screen, sym.nxt_code, "41;61", "0")
 
-        # Override the default callback to handle real-time data ticks
-        self.kw.OnReceiveRealData = self._handle
+        handler = getattr(self.kw, "OnReceiveRealData", None)
+        if handler is not None:
+            try:  # PyKiwoom signal
+                handler.connect(self._handle)  # type: ignore[attr-defined]
+            except AttributeError:  # COM fallback
+                self.kw.OnReceiveRealData = self._handle  # type: ignore[assignment]
 
     @pyqtSlot(str, str, str)
     def _handle(self, code: str, real_type: str, real_data: str) -> None:
@@ -86,7 +89,7 @@ class MainWindow(QMainWindow):
 
     def load_symbols(self) -> None:
         self.symbols = load_symbols()
-        self.log_message(f"Loaded {len(self.symbols)} symbols.")
+               self.log_message(f"Loaded {len(self.symbols)} symbols.")
 
     def start_test(self) -> None:
         if not self.symbols:
@@ -94,7 +97,19 @@ class MainWindow(QMainWindow):
             return
         try:
             self.log_message("Connecting to Kiwoom…")
+            login_loop = QEventLoop()
+
+            def _on_login(err_code: int) -> None:
+                login_loop.quit()
+
+            try:
+                self.kiwoom.OnEventConnect.connect(_on_login)  # type: ignore[attr-defined]
+            except AttributeError:
+                self.kiwoom.OnEventConnect = _on_login  # type: ignore[assignment]
+
             self.kiwoom.CommConnect()
+            login_loop.exec_()
+
             raw_accounts = self.kiwoom.GetLoginInfo("ACCNO")
             accounts = raw_accounts.split(";") if isinstance(raw_accounts, str) else raw_accounts
             account = accounts[0] if accounts else None
@@ -111,19 +126,19 @@ class MainWindow(QMainWindow):
 
     def on_tick(self, tick: Tick) -> None:
         self.log_message(
-            f"Tick: {tick.symbol.ticker} {tick.exchange} bid={tick.bid} ask={tick.ask}"
+            f"Tick: {tick.symbol.name} {tick.exchange} bid={tick.bid} ask={tick.ask}"
         )
         intents = self.detector.on_tick(tick)
         for intent in intents:
             if self.risk.approve(intent):
                 self.log_message(
-                    f"Approved: {intent.symbol.ticker} "
+                    f"Approved: {intent.symbol.name} "
                     f"{intent.buy_exchange}->{intent.sell_exchange}"
                 )
                 try:
                     self.executor.execute([intent])
                     self.log_message(
-                        f"Executed: {intent.symbol.ticker} "
+                        f"Executed: {intent.symbol.name} "
                         f"{intent.buy_exchange}->{intent.sell_exchange} "
                         f"qty={intent.qty}"
                     )
