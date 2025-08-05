@@ -7,8 +7,6 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QDialog,
-    QPlainTextEdit,
 )
 from PyQt5.QtCore import pyqtSlot, QEventLoop, QTimer
 from pykiwoom.kiwoom import Kiwoom
@@ -20,21 +18,8 @@ from risk_manager import RiskManager
 from order_executor import OrderExecutor
 
 
-class StatusDialog(QDialog):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setWindowTitle("Runtime Status")
-        self.text = QPlainTextEdit(readOnly=True)
-        layout = QVBoxLayout()
-        layout.addWidget(self.text)
-        self.setLayout(layout)
-
-    def update_status(self, msg: str) -> None:
-        self.text.appendPlainText(msg)
-
-
 class Feed:
-    """Minimal Kiwoom real-time feed wrapper."""
+    """Minimal Kiwoom real‑time feed wrapper."""
 
     def __init__(self, kiwoom: Kiwoom, symbols, on_tick, logger):
         self.kw = kiwoom
@@ -51,9 +36,9 @@ class Feed:
 
         handler = getattr(self.kw, "OnReceiveRealData", None)
         if handler is not None:
-            try:
+            try:  # PyKiwoom signal
                 handler.connect(self._handle)  # type: ignore[attr-defined]
-            except AttributeError:
+            except AttributeError:  # COM fallback
                 self.kw.OnReceiveRealData = self._handle  # type: ignore[assignment]
 
     @pyqtSlot(str, str, str)
@@ -101,12 +86,9 @@ class MainWindow(QMainWindow):
 
         self.executor = None
         self.feed = None
-        self.status = StatusDialog()
-        self.status.show()
 
     def log_message(self, text: str) -> None:
         self.log.append(text)
-        self.status.update_status(text)
 
     def load_symbols(self) -> None:
         self.symbols = load_symbols()
@@ -155,6 +137,7 @@ class MainWindow(QMainWindow):
             account = accounts[0] if accounts else None
             if not account:
                 raise RuntimeError("No Kiwoom account available")
+
             self.executor = OrderExecutor(session=self.kiwoom, account=account)
             self.log_message(f"Using account {account}")
             self.feed = Feed(self.kiwoom, self.symbols, self.on_tick, self.log_message)
